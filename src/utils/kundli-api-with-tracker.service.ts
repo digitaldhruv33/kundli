@@ -11,14 +11,15 @@ export class KundliApiWithTrackerService {
     password: process.env.ASTROLOGY_API_KEY as string,
   };
   private readonly apiCounter = [0, 0];
-  async getFreeKundlis(requestData: Record<string, any>) {
-    requestData['user_id'] = requestData['user_id'] || -3;
-    if (this.apiCounter[0] >= 33) {
+  async getFreeKundlis(apiKey:string,requestData: Record<string, any>) {
+    const apiKeyUsageDetails=await this.getApiKeyDetails(apiKey);
+    if(apiKeyUsageDetails.currentUsage>=apiKeyUsageDetails.monthlyUsageLimit){
       throw new HttpException(
         { message: 'Api limit exceed' },
         HttpStatus.PAYMENT_REQUIRED,
       );
     }
+    requestData['user_id'] = requestData['user_id'] || -3;
     const cachedValue = (await this.cacheManager.get(
       requestData['user_id'],
     )) as string | undefined;
@@ -37,19 +38,13 @@ export class KundliApiWithTrackerService {
           this.cacheManager.set(requestData['user_id'], JSON.stringify(e.data));
           return e;
         })
-        // .catch((err) => {
-        //   this.cacheManager.set(requestData['user_id'], JSON.stringify(err));
-        //   console.log(err);
-
-        //   throw err;
-        // })
         .finally(() => {
           this.apiCounter[0]++;
           // request tracker
         })
     );
   }
-  getPaidKundlis(requestData: Record<string, any>) {
+  getPaidKundlis(apiKey:string,requestData: Record<string, any>) {
     return axios
       .post(process.env.PAID_KUNDLI_API as string, requestData, {
         auth: this.auth,
@@ -59,5 +54,11 @@ export class KundliApiWithTrackerService {
 
         // request tracker
       });
+  }
+  async getApiKeyDetails(apiKey:string){
+    return {
+      monthlyUsageLimit:0,
+      currentUsage:0,
+    }
   }
 }
